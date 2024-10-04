@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chord Progression Creator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #000;
+            height: 100vh;
+        }
+        .container {
+            background: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            color: #FFF;
+            border: 4px solid #222;
+            border-radius: 10px;
+        }
+        #loading {
+            display: none;
+            position:absolute;
+            top: 0;
+            left: 0;
+            text-align: center;
+            padding: 10px;
+            color: #888;
+            font-style: italic;
+            width: 100%;
+            height: 100%;
+        }
+
+        #navigation {
+            padding: 20px;
+            background: #444;
+        }
+        #suggestions {
+            border-radius: 5px;
+            display: inline;
+        }
+        #suggestions button {
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+
+        #chord-controls {
+            padding: 20px;            
+        }
+        .chord-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .chord-button,
+        .navigation button,
+        .chord-row button {
+            margin-right: 8px;
+            padding: 8px 10px;
+            background-color: #777;
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        #navigation .add-button,
+        .add-button {
+            background-color: #04AA6D;
+        }
+        .chord-row button.delete-button {
+            background-color: #ff4d4d;
+            font-weight: bolder;
+        }
+        .navigation select,
+        .chord-row select {
+            padding: 4px;
+            margin: 8px 8px 8px 0;
+            box-sizing: border-box;
+            border: 3px solid #555;
+            border-radius: 4px;
+            background: #000;
+            color: #DDD;
+            font-size: 16px;
+        }
+        .navigation select:focus,
+        .chord-row select:focus {
+            border: 3px solid #777;
+            color: #FFF;
+            background: #222;
+            outline: none;
+        }
+
+
+        /*=======
+        Piano Layout
+        ==============*/
+        .piano-container {
+            display: flex;
+            height: 110px;
+            width: 100%;
+            border: 1px solid #000;
+            margin-top: 10px;
+            position: relative;
+        }
+        .white-key {
+            flex-grow: 1;
+            border-right: 1px solid #000;
+            background-color: #fff;
+            z-index: 2;
+            position: relative;
+            color: #777;
+        }
+
+        .white-key::after {
+            content: "";
+            width: 100%;
+            height: 10px;
+            background: #777;
+            bottom: -10px;
+            left: -2px;
+            border: 1px solid black;
+            border-top: 2px solid white;
+            position: absolute;
+            transform: skew(350deg);
+        }
+
+        .white-key:last-child {
+            border-right: none;
+        }
+        .black-key-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 100%;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .black-key {
+            position: absolute;
+            background-color: #555;
+            width: 3.5%; /* Adjusted for 3 octaves (8% * 2/3) */
+            height: 60%;
+            top: 0;
+            z-index: 2;
+            pointer-events: auto;
+            border: 1px solid black;
+            border-top: none;
+            box-shadow: inset 0px -4px 0 rgba(0, 0, 0, 0.8),
+                        inset 4px 0 2px rgba(0, 0, 0, 0.8),
+                        inset -4px 0 2px rgba(0, 0, 0, 0.8);
+            border-radius: 0 0 3px 3px;
+        }
+        /*
+        .played-key {
+            background-color: #ff6b6b;
+            color: white;
+            box-shadow: none;
+        }
+        */
+        .white-key.played-key {
+            animation-name: pianoKeyWhite;
+            animation-duration: 2s;
+        }
+        @keyframes pianoKeyWhite {
+            0%   {background-color: #ff6b6b; color: white;}
+            60%  {background-color: #ff6b6b; color: white;}
+            100% {background-color: #FFF; color: #777;}
+        }
+        .black-key.played-key {
+            animation-name: pianoKeyBlack;
+            animation-duration: 2s;
+        }
+        @keyframes pianoKeyBlack {
+            0%   {background-color: #ff6b6b; box-shadow: none;}
+            60%   {background-color: #ff6b6b; box-shadow: none;}
+            100% {background-color: #555; box-shadow: inset 0px -4px 0 rgba(0, 0, 0, 0.8),
+                        inset 4px 0 2px rgba(0, 0, 0, 0.8),
+                        inset -4px 0 2px rgba(0, 0, 0, 0.8);}
+        }
+
+        .key-label {
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px; /* Reduced font size for better fit */
+            z-index: 3;
+        }
+        .black-key .key-label {
+            color: white;
+            bottom: 2px;
+        }
+
+
+        /*=======
+        Chord Experimentation
+        ==============*/
+        .soundboard-container {
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .soundboard-container h2 {
+            margin-bottom: 0;
+            padding: 0;
+        }
+        .soundboard-container .navigation {
+            padding: 10px;
+        }
+        .chord-group {
+            position:relative;
+            padding: 10px 10px 10px 50px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: #333;
+            justify-content: left;
+            align-items: center;
+            border-radius: 5px;
+            box-shadow: inset 5px 10px 20px 5px rgba(0,0,0,0.5);
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+        .chord-group h3 {
+            position:absolute;
+            display: block;
+            margin: 0;
+            top: 0;
+            left:0;
+            width: 30px;
+            text-align: center;
+            padding: 10px;
+        }
+        .pill-button {
+            padding: 0;
+        }
+        .chord-button-container {
+            align-items: center;
+        }
+        .add-button,
+        .chord-button {
+            padding: 10px 6px;
+            margin: 0;
+            font-size: 14px;
+            border-radius: 5px 0 0 5px;
+            cursor: pointer;
+            line-height: 18px;
+            border: 0;
+        }
+        .pill-button .add-button {
+            color: white;
+            border-radius: 0 5px 5px 0;
+        }
+
+
+        /*=======
+        Circle of Fifths
+        ==============*/
+        #circle-of-fifths-container {
+            width: 300px;
+            height: 300px;
+            margin: 20px auto;
+        }
+
+        #circle-of-fifths {
+            width: 100%;
+            height: 100%;
+        }
+
+        .cof-segment {
+            cursor: pointer;
+            transition: fill 0.3s;
+        }
+
+        .cof-segment:hover {
+            fill: #e0e0e0;
+        }
+
+        .cof-text {
+            font-size: 14px;
+            font-weight: bold;
+            text-anchor: middle;
+            dominant-baseline: central;
+            pointer-events: none;
+        }
+
+        .highlight-main { fill: #90EE90; } /* Light Green */
+        .highlight-neighbor { fill: #006400; } /* Dark Green */
+        .highlight-blue { fill: #ADD8E6; } /* Light Blue */
+    </style>
+</head>
+<body>
+    <div id="loading">Loading piano samples...</div>
+    <div class="container">
+        <div id="chord-controls">
+            <h1>Chord Progression Creator</h1>
+            <div id="chord-container"></div>
+        </div>
+        <div id="navigation" class="navigation">
+            <button id="add-chord" class="add-button">+ Add Chord</button>
+            <button id="export-midi">&#8681; Export to MIDI</button>
+        </div>
+        <div id="chord-display" class="chord-display"></div>
+        <div class="soundboard-container">
+            <h2>Chord Experimentation</h2>
+            <div class="navigation">
+                <label for="style-select">Style:</label>
+                <select id="style-select"><option>Loading...</option></select>
+                <label for="key-select">Key:</label>
+                <select id="key-select">
+                    <option value="C">C</option>
+                    <option value="C#">C#</option>
+                    <option value="D">D</option>
+                    <option value="D#">D#</option>
+                    <option value="E">E</option>
+                    <option value="F">F</option>
+                    <option value="F#">F#</option>
+                    <option value="G">G</option>
+                    <option value="G#">G#</option>
+                    <option value="A">A</option>
+                    <option value="A#">A#</option>
+                    <option value="B">B</option>
+                </select>
+            </div>
+            <div id="chord-groups"></div>
+            <div id="chord-display"></div>
+            <div id="suggestions"></div>
+        </div>
+        <!--div id="circle-of-fifths-container">
+            <svg id="circle-of-fifths" viewBox="0 0 300 300"></svg>
+        </div-->
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://unpkg.com/@tonejs/midi"></script>
+    <script>
+        const rootNotes = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
+        const chordQualities = {
+            'Major': ['maj', '6', 'maj7', '9', 'add9','11','13'],
+            'Minor': ['min', 'm6', 'min7','9','11','13'],
+            'Dominant': ['7', '9', '11', '13'],
+            'Diminished': ['dim'],
+            'Augmented': ['aug', '7','9','13'],
+            'Suspended': ['sus2', 'sus4']
+        };
+        const playOctave = 3;
+
+        const styles = {
+            blues: {
+                progression: ['I', 'IV', 'V'],
+                extensions: ['maj', '7', '9', '13'],
+                qualities: ['Major', 'Dominant']
+            },
+            jazz: {
+                progression: ['II', 'V', 'I'],
+                extensions: ['7', '9', '13'],
+                qualities: ['Minor', 'Dominant', 'Major']
+            },
+            soul: {
+                progression: ['I', 'vi', 'IV', 'V'],
+                extensions: ['7', '9'],
+                qualities: ['Major', 'Minor', 'Dominant']
+            },
+            pop: {
+                progression: ['I', 'IV', 'V'],
+                extensions: ['6', '7', '9'],
+                qualities: ['Major', 'Minor', 'Dominant']
+            },
+            edm: {
+                progression: ['I', 'IV', 'V', 'II'],
+                extensions: ['7', '9', '13'],
+                qualities: ['Major', 'Minor', 'Dominant', 'Augmented']
+            },
+            rock: {
+                progression: ['I','V', 'vi', 'IV'],
+                extensions: ['7', '9', '13'],
+                qualities: ['Major', 'Minor', 'Dominant', 'Augmented', 'Diminished']
+            },
+            funk: {
+                progression: ['I','V','vi','IV'],
+                extensions: ['7', '9', '13'],
+                qualities: ['Major', 'Minor', 'Dominant']
+            },
+            country: {
+                progression: ['I','IV','V'],
+                extensions: ['7', '9', '13'],
+                qualities: ['Major', 'Minor', 'Dominant']
+            },
+            reggae: {
+                progression: ['I','vi','IV','V'],
+                extensions: ['7', '9', '13'],
+                qualities: ['Major', 'Minor', 'Dominant']
+            },
+            classical: {
+                progression: ['I','V','I'],
+                extensions: ['7', '9', '13', '11'],
+                qualities: ['Major', 'Minor', 'Dominant', 'Diminished']
+            },
+            hipHop: {
+                progression: ['I','V','vi','IV'],
+                extensions: ['7', '9', '13'],
+                qualities: ['Major', 'Minor', 'Dominant']
+            }
+        };
+
+        const chordContainer = document.getElementById('chord-container');
+        const suggestionsContainer = document.getElementById('suggestions');
+        const addChordButton = document.getElementById('add-chord');
+        const exportMidiButton = document.getElementById('export-midi');
+        const loadingIndicator = document.getElementById('loading');
+        
+        const styleSelect = document.getElementById('style-select');
+        const keySelect = document.getElementById('key-select');
+        const chordGroupsContainer = document.getElementById('chord-groups');
+
+        let piano;
+        let pianoReady = false;
+
+        // Initialize the piano sampler
+        const initPiano = async () => {
+            loadingIndicator.style.display = 'block';
+            piano = new Tone.Sampler({
+                urls: {
+                    A0: "A0.mp3",
+                    C1: "C1.mp3",
+                    "D#1": "Ds1.mp3",
+                    "F#1": "Fs1.mp3",
+                    A1: "A1.mp3",
+                    C2: "C2.mp3",
+                    "D#2": "Ds2.mp3",
+                    "F#2": "Fs2.mp3",
+                    A2: "A2.mp3",
+                    C3: "C3.mp3",
+                    "D#3": "Ds3.mp3",
+                    "F#3": "Fs3.mp3",
+                    A3: "A3.mp3",
+                    C4: "C4.mp3",
+                    "D#4": "Ds4.mp3",
+                    "F#4": "Fs4.mp3",
+                    A4: "A4.mp3",
+                    C5: "C5.mp3",
+                    "D#5": "Ds5.mp3",
+                    "F#5": "Fs5.mp3",
+                    A5: "A5.mp3",
+                    C6: "C6.mp3",
+                    "D#6": "Ds6.mp3",
+                    "F#6": "Fs6.mp3",
+                    A6: "A6.mp3",
+                    C7: "C7.mp3",
+                    "D#7": "Ds7.mp3",
+                    "F#7": "Fs7.mp3",
+                    A7: "A7.mp3",
+                },
+                baseUrl: "https://tonejs.github.io/audio/salamander/",
+            }).toDestination();
+
+            await Tone.loaded();
+            pianoReady = true;
+            loadingIndicator.style.display = 'none';
+        };
+
+        displayChordVisually('chord-display', false);
+        initPiano();
+
+        function populateStyleSelect(styles) {
+          const styleSelect = document.getElementById('style-select');
+
+          // Clear existing options
+          styleSelect.innerHTML = '';
+
+          // Iterate through styles and create options
+          for (const style in styles) {
+            const option = document.createElement('option');
+            option.value = style;
+            option.textContent = style.charAt(0).toUpperCase() + style.slice(1); // Capitalize first letter
+            styleSelect.appendChild(option);
+          }
+        }
+
+        function createChordRow() {
+            createChordRowWithSelection(false,false,false);
+        }
+
+        function createChordRowWithSelection(root,quality,extension) {
+            // Catch incorrect assignment of Maj7
+            if (extension === "7" && quality === "Major") {
+                extension = "maj7";
+            }
+            else if (extension === "7" && quality === "Minor") {
+                extension = "min7";
+            }
+            if (extension === "9" && quality === "Major") {
+                extension = "maj9";
+            }
+
+            const row = document.createElement('div');
+            row.className = 'chord-row';
+
+            const rootSelect = document.createElement('select');
+            rootSelect.className = 'root-note';
+            rootNotes.forEach(note => {
+                const option = document.createElement('option');
+                option.value = note;
+                option.textContent = note;
+                if (root !== false && note === root) {
+                    option.selected = true;
+                }
+                rootSelect.appendChild(option);
+            });
+
+            const qualitySelect = document.createElement('select');
+            qualitySelect.className = 'chord-quality';
+            Object.keys(chordQualities).forEach(sQuality => {
+                const option = document.createElement('option');
+                option.value = sQuality;
+                option.textContent = sQuality;
+                if (quality !== false && sQuality === quality) {
+                    option.selected = true;
+                }
+                qualitySelect.appendChild(option);
+            });
+
+            const extensionSelect = document.createElement('select');
+            extensionSelect.className = 'chord-extension';
+            
+            function updateExtensions() {
+                extensionSelect.innerHTML = '';
+                const selectedQuality = qualitySelect.value;
+                chordQualities[selectedQuality].forEach(sExtension => {
+                    const option = document.createElement('option');
+                    option.value = sExtension;
+                    option.textContent = sExtension;
+                    if (extension !== false && sExtension === extension) {
+                        option.selected = true;
+                    }
+                    extensionSelect.appendChild(option);
+                });
+            }
+
+            qualitySelect.addEventListener('change', updateExtensions);
+
+            // Initial population of extensions
+            updateExtensions();
+
+            const listenButton = document.createElement('button');
+            listenButton.className = 'listen';
+            listenButton.textContent = '►';
+            listenButton.addEventListener('click', () => playChordRow(row));
+
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-button';
+            deleteButton.textContent = '×';
+            deleteButton.addEventListener('click', () => deleteChordRow(row));
+
+            row.appendChild(rootSelect);
+            row.appendChild(qualitySelect);
+            row.appendChild(extensionSelect);
+            row.appendChild(listenButton);
+            row.appendChild(deleteButton);
+
+            rootSelect.addEventListener('change', updateChordProgression);
+            qualitySelect.addEventListener('change', updateChordProgression);
+            extensionSelect.addEventListener('change', updateChordProgression);
+
+            // Append the row to the chord container
+            const chordContainer = document.getElementById('chord-container');
+            chordContainer.appendChild(row);
+
+            updateChordProgression();
+            updateSuggestions();
+
+            return row;
+        }
+
+        function deleteChordRow(row) {
+            row.remove();
+            updateSuggestions();
+        }
+
+        function updateSuggestions() {
+            /*
+            =======To be updated!
+
+            const lastRow = chordContainer.lastElementChild;
+            if (!lastRow) {
+                suggestionsContainer.innerHTML = '';
+                return;
+            }
+
+            const currentChord = getChordFromRow(lastRow);
+            const nextChords = getNextChordSuggestions(currentChord);
+
+            suggestionsContainer.innerHTML = '<b>Circle of Fifths</b>&nbsp;';
+            nextChords.forEach(chord => {
+                const button = document.createElement('button');
+                button.textContent = chord;
+                button.addEventListener('click', () => addSuggestedChord(chord));
+                suggestionsContainer.appendChild(button);
+            });
+            */
+        }
+
+        function getChordFromRow(row) {
+            const root = row.querySelector('.root-note').value;
+            const quality = row.querySelector('.chord-quality').value;
+            const extension = row.querySelector('.chord-extension').value;
+            return `${root} ${quality}${extension !== '(none)' ? ' ' + extension : ''}`;
+        }
+
+        function getNextChordSuggestions(currentChord) {
+            const [root, quality] = currentChord.split(' ');
+            const rootIndex = rootNotes.indexOf(root);
+            
+            const suggestions = [];
+
+            // Dominant (V)
+            suggestions.push(`${rootNotes[(rootIndex + 7) % 12]} ${quality}`);
+
+            // Subdominant (IV)
+            suggestions.push(`${rootNotes[(rootIndex + 5) % 12]} ${quality}`);
+
+            // Relative minor/major
+            if (quality === 'Major') {
+                suggestions.push(`${rootNotes[(rootIndex + 9) % 12]} Minor`);
+            } else {
+                suggestions.push(`${rootNotes[(rootIndex + 3) % 12]} Major`);
+            }
+
+            // Secondary dominant (V of V)
+            suggestions.push(`${rootNotes[(rootIndex + 2) % 12]} Major`);
+
+            return suggestions;
+        }
+
+        async function playChordRow(row) {
+            const root = row.querySelector('.root-note').value;
+            const quality = row.querySelector('.chord-quality').value;
+            const extension = row.querySelector('.chord-extension').value;
+    
+           playChord(root,quality,extension);
+        }
+
+        async function playChord(root,quality,extension) {
+           let notes = getChordNotes(root, quality, extension);
+
+            await Tone.start();
+
+            console.log('Playing notes:', notes); // For debugging
+
+            try {
+                // Play the chord for 1 second
+                piano.triggerAttackRelease(notes, 1);
+            } catch (error) {
+                console.error('Error playing chord:', error);
+            }
+            displayChordVisually('chord-display', notes);
+        }
+
+
+        function getNote(root, semitones) {
+            const chromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const rootIndex = chromaticScale.indexOf(root);
+            const noteIndex = (rootIndex + semitones) % 12;
+            const octave = Math.floor((rootIndex + semitones) / 12) + playOctave;
+            return chromaticScale[noteIndex] + octave;
+        }
+
+        function getChordNotes(root, quality, extension) {
+            let notes = [root + playOctave]; // Add octave to root note
+
+            const addNote = (semitones) => {
+                notes.push(getNote(root, semitones));
+            };
+
+            switch (extension) {
+                case '':
+                case 'maj':
+                    addNote(4);  // Major third
+                    addNote(7);  // Perfect fifth
+                    break;
+                case 'min':
+                    addNote(3);  // Minor third
+                    addNote(7);  // Perfect fifth
+                    break;
+                case 'add9':
+                    addNote(4);  // Minor third
+                    addNote(7);  // Perfect fifth
+                    addNote(14);  // Perfect fifth
+                    break;
+                case 'maj7':
+                    addNote(4);  // Major third
+                    addNote(7);  // Perfect fifth
+                    addNote(11); // Major seventh
+                    break;
+                case 'm6':
+                    addNote(3);  // Minor third
+                    addNote(7);  // Perfect fifth
+                    addNote(9); // Minor seventh
+                    break;
+                case 'min7':
+                    addNote(3);  // Minor third
+                    addNote(7);  // Perfect fifth
+                    addNote(10); // Minor seventh
+                    break;
+                case 'm9':
+                    addNote(3);  // Minor third
+                    addNote(7);  // Perfect fifth
+                    addNote(10); // Minor seventh
+                    addNote(14); // Ninth
+                    break;
+                case 'maj9':
+                    addNote(4);  // Major third
+                    addNote(7);  // Perfect fifth
+                    addNote(11); // Major seventh
+                    addNote(14); // Ninth
+                    break;
+                case '6':
+                    addNote(4);  // Minor third
+                    addNote(7);  // Perfect fifth
+                    addNote(9);  // Perfect fifth
+                    break;
+                case '7':
+                    addNote(quality === "Minor" ? 3 : 4); //In some cases a root + Minor + 7 instead of Min7 ends up here.
+                    addNote(quality === "Augmented" ? 8 : 7); //In some cases a root + Major + 7 instead of Maj7 ends up here.
+                    addNote(quality === "Major" ? 11 : 10); //In some cases a root + Major + 7 instead of Maj7 ends up here.
+                    break;
+                case '9':
+                    addNote(quality === "Minor" ? 3 : 4); //In some cases a root + Minor + 7 instead of Min7 ends up here.
+                    addNote(quality === "Augmented" ? 8 : 7); //In some cases a root + Major + 7 instead of Maj7 ends up here.
+                    addNote(quality === "Major" ? 11 : 10); //In some cases a root + Major + 9 instead of Maj9 ends up here.
+                    addNote(14); // Ninth
+                    break;
+                case '11':
+                    addNote(quality === "Minor" ? 3 : 4); //In some cases a root + Minor + 7 instead of Min7 ends up here.
+                    addNote(quality === "Augmented" ? 8 : 7); //In some cases a root + Major + 7 instead of Maj7 ends up here.
+                    addNote(quality === "Major" ? 11 : 10); //In some cases a root + Major + 13 instead of Maj13 ends up here.
+                    addNote(14); // Ninth
+                    addNote(17); // Eleventh
+                    break;
+                case '13':
+                    addNote(quality === "Minor" ? 3 : 4); //In some cases a root + Minor + 7 instead of Min7 ends up here.
+                    addNote(quality === "Augmented" ? 8 : 7); //In some cases a root + Major + 7 instead of Maj7 ends up here.
+                    addNote(quality === "Major" ? 11 : 10); //In some cases a root + Major + 13 instead of Maj13 ends up here.
+                    addNote(14); // Ninth
+                    addNote(21); // Thirteenth
+                    break;
+                case 'dim':
+                    addNote(3);  // Minor third
+                    addNote(6);  // Diminished fifth
+                    break;
+                case 'aug':
+                    addNote(4);  // Major third
+                    addNote(8);  // Augmented fifth
+                    break;
+                case 'sus2':
+                    addNote(2);  // Major second
+                    addNote(7);  // Perfect fifth
+                    break;
+                case 'sus4':
+                    addNote(5);  // Perfect fourth
+                    addNote(7);  // Perfect fifth
+                    break;
+                default:
+                    console.warn('Unknown chord type:', extension);
+                    break;
+            }
+
+            return notes;
+        }
+
+        function displayChordVisually(containerId, chordNotes) {
+            // Remove previously highlighted keys
+            removePlayedKeys();
+
+            const container = document.getElementById(containerId);
+            container.innerHTML = ''; // Clear previous content
+
+            const pianoContainer = document.createElement('div');
+            pianoContainer.className = 'piano-container';
+
+            const blackKeyContainer = document.createElement('div');
+            blackKeyContainer.className = 'black-key-container';
+
+            const allNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const octaveStart = 3; // Starting octave
+            const octaveEnd = 5; // Ending octave
+
+            let whiteKeyCount = 0;
+
+            let whiteKeyAmount = (octaveEnd - octaveStart + 1) * 12;
+
+
+            for (let octave = octaveStart; octave <= octaveEnd; octave++) {
+                allNotes.forEach((note, index) => {
+                    const isBlackKey = note.includes('#');
+                    const key = document.createElement('div');
+                    
+                    const fullNote = `${note}${octave}`;
+                    
+                    const label = document.createElement('span');
+                    label.className = 'key-label';
+                    label.textContent = fullNote;
+                    key.appendChild(label);
+
+                    if (isBlackKey) {
+                        key.className = 'black-key';
+                        key.style.left = `${(whiteKeyCount - 0.5) * (100 / 21)}%`; // Adjusted for 3 octaves
+                        blackKeyContainer.appendChild(key);
+                    } else {
+                        key.className = 'white-key';
+                        pianoContainer.appendChild(key);
+                        whiteKeyCount++;
+                    }
+
+                    // Add data attribute for note identification
+                    key.dataset.note = fullNote;
+
+                    if (chordNotes !== false && chordNotes.includes(fullNote)) {
+                        key.classList.add('played-key');
+                    }
+                });
+            }
+
+            pianoContainer.appendChild(blackKeyContainer);
+            container.appendChild(pianoContainer);
+
+            // Highlight the played keys
+            if (chordNotes !== false) {
+                chordNotes.forEach(note => {
+                    const key = pianoContainer.querySelector(`[data-note="${note}"]`);
+                    if (key) {
+                        key.classList.add('played-key');
+                    }
+                });
+
+                setTimeout(function() {
+                    removePlayedKeys();
+                }, 1500);
+            }
+        }
+
+        function removePlayedKeys() {
+            const playedKeyElement = document.querySelector('.played-key');
+            if (!playedKeyElement) {
+                // Your script to execute after 1.5 seconds
+                const div = document.getElementById('chord-display');
+                const childNodes = div.querySelectorAll('*');
+                childNodes.forEach(child => child.classList.remove('played-key'));
+            }
+        }
+
+        function createChordQualitySelect() {
+            const select = document.getElementById('chord-quality-select');
+            for (const quality in chordQualities) {
+                const option = document.createElement('option');
+                option.value = quality;
+                option.textContent = quality;
+                select.appendChild(option);
+            }
+            select.onchange = createSoundboard;
+        }
+
+        function createSoundboard() {
+            const style = styleSelect.value;
+            const key = keySelect.value;
+            const styleData = styles[style];
+
+            chordGroupsContainer.innerHTML = '';
+
+            styleData.progression.forEach((degree, index) => {
+                const chordGroup = document.createElement('div');
+                chordGroup.className = 'chord-group';
+                chordGroup.innerHTML = `<h3>${degree}</h3>`;
+
+                const chordRoot = getChordRoot(key, degree);
+                
+                styleData.qualities.forEach(quality => {
+                    styleData.extensions.forEach(extension => {
+                        const chordName = getChordName(chordRoot, quality, extension);
+
+                        const buttonWrap = document.createElement('div');
+                        buttonWrap.className = 'pill-button';
+                        
+                        const button = document.createElement('button');
+                        button.className = 'chord-button';
+                        button.textContent = chordName; //+" "+chordRoot+" "+quality+" "+extension;
+                        button.title = chordRoot+" "+quality+" "+extension;
+                        button.onclick = () => playChord(chordRoot,quality,extension);
+
+                        const addButton = document.createElement('button');
+                        addButton.className = 'add-button';
+                        addButton.textContent = '+';
+                        addButton.onclick = () => createChordRowWithSelection(chordRoot,quality,extension);
+
+                        buttonWrap.appendChild(button);
+                        buttonWrap.appendChild(addButton);
+                        chordGroup.appendChild(buttonWrap);
+                    });
+                });
+
+                chordGroupsContainer.appendChild(chordGroup);
+            });
+        }
+
+        function getChordRoot(key, degree) {
+            const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const keyIndex = notes.indexOf(key);
+            const intervals = {
+                'I': 0, 'II': 2, 'III': 4, 'IV': 5, 'V': 7, 'VI': 9, 'VII': 11,
+                'i': 0, 'ii': 2, 'iii': 4, 'iv': 5, 'v': 7, 'vi': 9, 'vii': 11
+            };
+            return notes[(keyIndex + intervals[degree]) % 12];
+        }
+
+        function getChordName(root, quality, extension) {
+            if (quality === 'Dominant') {
+                return `${root}${extension}`;
+            } else if (quality === 'Minor') {
+                return `${root}min${extension}`;
+            } else if (quality === 'Augmented') {
+                return `${root}aug${extension}`;
+            } else if (quality === 'Diminished') {
+                return `${root}dim${extension}`;
+            } else if (quality === 'Major') {
+                return `${root}maj${extension === 'maj'? '' : extension}`;
+            } else {
+                return `${root}${quality}${extension}`;
+            }
+        }
+
+        function updateChordProgression() {
+            const chords = [];
+            document.querySelectorAll('.chord-row').forEach(row => {
+                const root = row.querySelector('.root-note').value;
+                const quality = row.querySelector('.chord-quality').value;
+                const extension = row.querySelector('.chord-extension').value;
+                chords.push(`${root}${quality === 'Major' ? '' : quality.toLowerCase()}${extension}`);
+            });
+        }
+
+
+        function exportToMIDI() {
+            const midi = new Midi();
+            const track = midi.addTrack();
+
+            chordContainer.querySelectorAll('.chord-row').forEach((row, index) => {
+                const root = row.querySelector('.root-note').value;
+                const quality = row.querySelector('.chord-quality').value;
+                const extension = row.querySelector('.chord-extension').value;
+
+                const notes = getChordNotes(root, quality, extension);
+                notes.forEach(note => {
+                    track.addNote({
+                        midi: Tone.Frequency(note).toMidi(),
+                        time: index,
+                        duration: 1
+                    });
+                });
+            });
+
+            const midiData = midi.toArray();
+            const blob = new Blob([midiData], { type: 'audio/midi' });
+            const url = URL.createObjectURL(blob);
+
+
+            const a = document.createElement('a');
+            a.href = url;
+
+            const filename = "chord-progression";
+            const extension = ".mid";
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:T]/g, "_").split(".")[0];
+            const newFilename = `${filename}_${timestamp}${extension}`;
+
+            a.download = newFilename;
+            a.click();
+
+            URL.revokeObjectURL(url);
+        }
+
+/*
+        function createCircleOfFifths() {
+            const notes5 = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#', 'F'];
+          const svg = document.getElementById('circle-of-fifths');
+          const center = 150;
+          const outerRadius = 130;
+          const innerRadius = 100; // Adjusted inner radius
+
+          notes5.forEach((note, index) => {
+            const angle = (index * 30 - 90) * (Math.PI / 180);
+            const segment = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const startAngle = angle - (Math.PI / 12);
+            const endAngle = angle + (Math.PI / 12);
+            const x1 = center + outerRadius * Math.cos(startAngle);
+            const y1 = center + outerRadius * Math.sin(startAngle);
+            const x2 = center + outerRadius * Math.cos(endAngle);
+            const y2 = center + outerRadius * Math.sin(endAngle);
+            const d = [
+              'M', center, center,
+              'L', x1, y1,
+              'A', outerRadius, outerRadius, 0, 0, 1, x2, y2,
+              'Z'
+            ].join(' ');
+            segment.setAttribute('d', d);
+            segment.setAttribute('fill', '#f0f0f0');
+            segment.setAttribute('stroke', '#000');
+            segment.setAttribute('class', 'cof-segment');
+            segment.setAttribute('data-note', note);
+            segment.addEventListener('click', (e) => highlightSegments(e.target));
+
+            // Calculate text position relative to slice center
+            const textAngle = (startAngle + endAngle) / 2; // Midpoint angle
+            const textRadius = (innerRadius + outerRadius) / 2; // Midpoint between inner and outer radius
+            const textX = center + textRadius * Math.cos(textAngle);
+            const textY = center + textRadius * Math.sin(textAngle);
+
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.textContent = note;
+            text.setAttribute('x', textX);
+            text.setAttribute('y', textY);
+            text.setAttribute('class', 'cof-text');
+            text.setAttribute('text-anchor', 'middle'); // Center text horizontally within slice
+
+            svg.appendChild(segment);
+            svg.appendChild(text);
+          });
+        }
+        */
+
+function createCircleOfFifths() {
+    const notes5 = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#', 'F'];
+  const svg = document.getElementById('circle-of-fifths');
+  const center = 150;
+  const outerRadius = 130;
+  const innerRadius = 80; // Adjust inner radius to create a gap
+
+  notes5.forEach((note, index) => {
+    const angle = (index * 30 - 90) * (Math.PI / 180);
+    const startAngle = angle - (Math.PI / 12);
+    const endAngle = angle + (Math.PI / 12);
+    const x1 = center + outerRadius * Math.cos(startAngle);
+    const y1 = center + outerRadius * Math.sin(startAngle);
+    const x2 = center + outerRadius * Math.cos(endAngle);
+    const y2 = center + outerRadius * Math.sin(endAngle);
+    const segment = document.createElementNS('http://www.w3.org/2000/svg', 'path'); // Declare segment here
+    const d = [
+      'M', center + innerRadius * Math.cos(startAngle), center + innerRadius * Math.sin(startAngle),
+      'A', innerRadius, innerRadius, 0, 0, 0, center + innerRadius * Math.cos(endAngle), center + innerRadius * Math.sin(endAngle),
+      'A', outerRadius, outerRadius, 0, 0, 1, x2, y2,
+      'A', outerRadius, outerRadius, 0, 0, 1, x1, y1,
+      'A', innerRadius, innerRadius, 0, 0, 0, center + innerRadius * Math.cos(startAngle), center + innerRadius * Math.sin(startAngle),
+      'Z'
+    ].join(' ');
+    segment.setAttribute('d', d);
+    segment.setAttribute('fill', '#f0f0f0');
+    segment.setAttribute('stroke', '#000');
+    segment.setAttribute('class', 'cof-segment');
+    segment.setAttribute('data-note', note);
+    segment.addEventListener('click', (e) => highlightSegments(e.target));
+
+    // Calculate text position relative to slice center
+    const textAngle = (startAngle + endAngle) / 2; // Midpoint angle
+    const textRadius = (innerRadius + outerRadius) / 2; // Midpoint between inner and outer radius
+    const textX = center + textRadius * Math.cos(textAngle);
+    const textY = center + textRadius * Math.sin(textAngle);
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.textContent = note;
+    text.setAttribute('x', textX);
+    text.setAttribute('y', textY);
+    text.setAttribute('class', 'cof-text');
+    text.setAttribute('text-anchor', 'middle'); // Center text horizontally within slice
+
+    svg.appendChild(segment);
+    svg.appendChild(text);
+  });
+}
+
+
+        function highlightSegments(clickedSegment) {
+            const notes5 = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#', 'F'];
+
+            // Reset all segments
+            document.querySelectorAll('.cof-segment').forEach(segment => {
+                segment.setAttribute('fill', '#f0f0f0');
+                segment.classList.remove('highlight-main', 'highlight-neighbor', 'highlight-blue');
+            });
+
+            const clickedNote = clickedSegment.getAttribute('data-note');
+            const clickedIndex = notes5.indexOf(clickedNote);
+
+            // Highlight clicked note
+            clickedSegment.classList.add('highlight-main');
+
+            // Highlight neighbors
+            const leftNeighbor = document.querySelector(`.cof-segment[data-note="${notes5[(clickedIndex - 1 + 12) % 12]}"]`);
+            const rightNeighbor = document.querySelector(`.cof-segment[data-note="${notes5[(clickedIndex + 1) % 12]}"]`);
+            leftNeighbor.classList.add('highlight-neighbor');
+            rightNeighbor.classList.add('highlight-neighbor');
+
+            // Highlight next three clockwise
+            for (let i = 1; i <= 3; i++) {
+                const blueNote = notes5[(clickedIndex + i + 1) % 12];
+                const blueSegment = document.querySelector(`.cof-segment[data-note="${blueNote}"]`);
+                blueSegment.classList.add('highlight-blue');
+            }
+
+            circleClicked(clickedNote);
+        }
+        function circleClicked(note) {
+            // Implement the logic to add the chord to the progression
+            console.log('Adding chord to progression:', note);
+        }
+
+        // Call these functions to initialize the soundboard
+        document.addEventListener('DOMContentLoaded', function() {
+            styleSelect.addEventListener('change', createSoundboard);
+            keySelect.addEventListener('change', createSoundboard);
+            
+            // Populate the Style dropdown with options from the styles variabele
+            populateStyleSelect(styles);
+
+            // Initial update
+            createSoundboard();
+            
+            // Work in progress
+            //createCircleOfFifths();
+        });
+
+        addChordButton.addEventListener('click', createChordRow);
+        exportMidiButton.addEventListener('click', exportToMIDI);
+
+        // Create the first chord row
+        createChordRow();
+    </script>
+</body>
+</html>
